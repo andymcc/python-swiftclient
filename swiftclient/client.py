@@ -764,7 +764,7 @@ def head_object(url, token, container, name, http_conn=None):
 def put_object(url, token=None, container=None, name=None, contents=None,
                content_length=None, etag=None, chunk_size=None,
                content_type=None, headers=None, http_conn=None, proxy=None,
-               query_string=None):
+               query_string=None, obj_name=None):
     """
     Put an object
 
@@ -793,6 +793,7 @@ def put_object(url, token=None, container=None, name=None, contents=None,
     :param proxy: proxy to connect through, if any; None by default; str of the
                   format 'http://127.0.0.1:8888' to set one
     :param query_string: if set will be appended with '?' to generated path
+    :param obj_name: specifies name for object to be stored as in Swift
     :returns: etag from server response
     :raises ClientException: HTTP PUT request failed
     """
@@ -801,10 +802,12 @@ def put_object(url, token=None, container=None, name=None, contents=None,
     else:
         parsed, conn = http_connection(url, proxy=proxy)
     path = parsed.path
+    if not obj_name:
+        obj_name = name
     if container:
         path = '%s/%s' % (path.rstrip('/'), quote(container))
     if name:
-        path = '%s/%s' % (path.rstrip('/'), quote(name))
+        path = '%s/%s' % (path.rstrip('/'), quote(obj_name))
     if query_string:
         path += '?' + query_string
     if headers:
@@ -828,7 +831,7 @@ def put_object(url, token=None, container=None, name=None, contents=None,
     if hasattr(contents, 'read'):
         if chunk_size is None:
             chunk_size = 65536
-        conn.putrequest('PUT', path)
+        conn.putrequest('PUT', path, name)
         for header, value in headers.iteritems():
             conn.putheader(header, value)
         if content_length is None:
@@ -1103,7 +1106,7 @@ class Connection(object):
 
     def put_object(self, container, obj, contents, content_length=None,
                    etag=None, chunk_size=None, content_type=None,
-                   headers=None, query_string=None):
+                   headers=None, query_string=None, obj_name=None):
         """Wrapper for :func:`put_object`"""
 
         def _default_reset(*args, **kwargs):
@@ -1127,7 +1130,8 @@ class Connection(object):
         return self._retry(reset_func, put_object, container, obj, contents,
                            content_length=content_length, etag=etag,
                            chunk_size=chunk_size, content_type=content_type,
-                           headers=headers, query_string=query_string)
+                           headers=headers, query_string=query_string,
+                           obj_name=obj_name)
 
     def post_object(self, container, obj, headers):
         """Wrapper for :func:`post_object`"""

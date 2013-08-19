@@ -799,6 +799,9 @@ def st_upload(parser, args, print_queue, error_queue):
                       help='When used in conjuction with --segment-size will '
                       'create a Static Large Object instead of the default '
                       'Dynamic Large Object.')
+    parser.add_option('-o', '--object-name', dest='obj_name',
+                      help='Specify the name the object will be stored as, '
+                      'can be different to the object name on disk')
     (options, args) = parse_args(parser, args)
     args = args[1:]
     if len(args) < 2:
@@ -816,8 +819,10 @@ def st_upload(parser, args, print_queue, error_queue):
             seg_container = args[0] + '_segments'
             if options.segment_container:
                 seg_container = options.segment_container
+            if options.obj_name:
+                obj_name = options.obj_name
             etag = conn.put_object(job.get('container', seg_container),
-                                   job['obj'], fp,
+                                   job['obj'], fp, obj_name=obj_name,
                                    content_length=job['segment_size'])
             job['segment_location'] = '/%s/%s' % (seg_container, job['obj'])
             job['segment_etag'] = etag
@@ -831,6 +836,7 @@ def st_upload(parser, args, print_queue, error_queue):
 
     def _object_job(job, conn):
         path = job['path']
+        obj_name = options.obj_name
         container = job.get('container', args[0])
         dir_marker = job.get('dir_marker', False)
         try:
@@ -858,7 +864,7 @@ def st_upload(parser, args, print_queue, error_queue):
                             raise
                 conn.put_object(container, obj, '', content_length=0,
                                 content_type='text/directory',
-                                headers=put_headers)
+                                headers=put_headers, obj_name=obj_name)
             else:
                 # We need to HEAD all objects now in case we're overwriting a
                 # manifest object and need to delete the old segments
@@ -954,7 +960,7 @@ def st_upload(parser, args, print_queue, error_queue):
 
                         put_headers['x-static-large-object'] = 'true'
                         conn.put_object(container, obj, manifest_data,
-                                        headers=put_headers,
+                                        headers=put_headers, obj_name=obj_name,
                                         query_string='multipart-manifest=put')
                     else:
                         new_object_manifest = '%s/%s/%s/%s/%s/' % (
@@ -966,11 +972,12 @@ def st_upload(parser, args, print_queue, error_queue):
                             old_manifest = None
                         put_headers['x-object-manifest'] = new_object_manifest
                         conn.put_object(container, obj, '', content_length=0,
-                                        headers=put_headers)
+                                        headers=put_headers, obj_name=obj_name)
                 else:
                     conn.put_object(
                         container, obj, open(path, 'rb'),
-                        content_length=getsize(path), headers=put_headers)
+                        content_length=getsize(path), headers=put_headers,
+                        obj_name=obj_name)
                 if old_manifest or old_slo_manifest_paths:
                     segment_queue = Queue(10000)
                     if old_manifest:
